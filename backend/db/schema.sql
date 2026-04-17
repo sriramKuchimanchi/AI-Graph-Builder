@@ -3,15 +3,13 @@
 -- PostgreSQL schema for pgAdmin 4
 --
 -- Setup:
---   1. In pgAdmin 4: right-click "Databases" → Create → Database → name "synapse"
+--   1. In pgAdmin 4: right-click "Databases" -> Create -> Database -> "synapse"
 --   2. Open Query Tool on the "synapse" database
 --   3. Paste this entire file and run (F5)
 -- =====================================================================
 
--- ---------- Extensions ----------
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ---------- Enums ----------
 DO $$ BEGIN
     CREATE TYPE document_status AS ENUM ('queued', 'parsing', 'extracting', 'indexed', 'failed');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -25,6 +23,30 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- =====================================================================
+-- users (auth)
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS users (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           TEXT        NOT NULL UNIQUE,
+    password_hash   TEXT        NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email));
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash      TEXT        NOT NULL UNIQUE,
+    expires_at      TIMESTAMPTZ NOT NULL,
+    used_at         TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id);
+
+-- =====================================================================
 -- documents
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS documents (
@@ -32,7 +54,7 @@ CREATE TABLE IF NOT EXISTS documents (
     name            TEXT        NOT NULL,
     mime_type       TEXT,
     size_bytes      BIGINT      NOT NULL DEFAULT 0,
-    storage_path    TEXT,                                      -- on-disk path or object key
+    storage_path    TEXT,
     status          document_status NOT NULL DEFAULT 'queued',
     error_message   TEXT,
     page_count      INTEGER,
@@ -43,9 +65,6 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS idx_documents_status     ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at DESC);
 
--- =====================================================================
--- document_chunks  (chunked text for embedding/retrieval)
--- =====================================================================
 CREATE TABLE IF NOT EXISTS document_chunks (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id     UUID        NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -60,7 +79,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
 CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON document_chunks(document_id);
 
 -- =====================================================================
--- entities  (graph nodes)
+-- entities (graph nodes)
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS entities (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,7 +87,7 @@ CREATE TABLE IF NOT EXISTS entities (
     type            entity_type NOT NULL DEFAULT 'Other',
     description     TEXT,
     mention_count   INTEGER     NOT NULL DEFAULT 0,
-    properties      JSONB       NOT NULL DEFAULT '{}'::jsonb,  -- arbitrary attributes
+    properties      JSONB       NOT NULL DEFAULT '{}'::jsonb,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (name, type)
@@ -78,9 +97,6 @@ CREATE INDEX IF NOT EXISTS idx_entities_type        ON entities(type);
 CREATE INDEX IF NOT EXISTS idx_entities_name_lower  ON entities(LOWER(name));
 CREATE INDEX IF NOT EXISTS idx_entities_properties  ON entities USING GIN (properties);
 
--- =====================================================================
--- entity_mentions  (links an entity to where it appeared)
--- =====================================================================
 CREATE TABLE IF NOT EXISTS entity_mentions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_id       UUID        NOT NULL REFERENCES entities(id)        ON DELETE CASCADE,
@@ -96,13 +112,13 @@ CREATE INDEX IF NOT EXISTS idx_mentions_entity_id ON entity_mentions(entity_id);
 CREATE INDEX IF NOT EXISTS idx_mentions_chunk_id  ON entity_mentions(chunk_id);
 
 -- =====================================================================
--- relationships  (graph edges)
+-- relationships (graph edges)
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS relationships (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_entity_id    UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
     target_entity_id    UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
-    predicate           TEXT        NOT NULL,                        -- e.g. "leads", "released"
+    predicate           TEXT        NOT NULL,
     confidence          NUMERIC(4,3) NOT NULL DEFAULT 0.0 CHECK (confidence BETWEEN 0 AND 1),
     document_id         UUID        REFERENCES documents(id) ON DELETE SET NULL,
     chunk_id            UUID        REFERENCES document_chunks(id) ON DELETE SET NULL,
@@ -117,11 +133,11 @@ CREATE INDEX IF NOT EXISTS idx_rel_target    ON relationships(target_entity_id);
 CREATE INDEX IF NOT EXISTS idx_rel_predicate ON relationships(predicate);
 
 -- =====================================================================
--- llms  (registry of available models)
+-- llms (registry)
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS llms (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    model_id        TEXT        NOT NULL UNIQUE,                     -- e.g. "gpt-5"
+    model_id        TEXT        NOT NULL UNIQUE,
     display_name    TEXT        NOT NULL,
     provider        llm_provider NOT NULL,
     enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -131,7 +147,7 @@ CREATE TABLE IF NOT EXISTS llms (
 );
 
 -- =====================================================================
--- queries  (user NL queries against the graph)
+-- queries / responses / citations
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS queries (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,9 +160,6 @@ CREATE TABLE IF NOT EXISTS queries (
 
 CREATE INDEX IF NOT EXISTS idx_queries_created_at ON queries(created_at DESC);
 
--- =====================================================================
--- llm_responses  (per-LLM responses for a query, before synthesis)
--- =====================================================================
 CREATE TABLE IF NOT EXISTS llm_responses (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     query_id        UUID        NOT NULL REFERENCES queries(id) ON DELETE CASCADE,
@@ -161,9 +174,6 @@ CREATE TABLE IF NOT EXISTS llm_responses (
 
 CREATE INDEX IF NOT EXISTS idx_llm_responses_query_id ON llm_responses(query_id);
 
--- =====================================================================
--- query_citations  (graph entities/relations cited in an answer)
--- =====================================================================
 CREATE TABLE IF NOT EXISTS query_citations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     query_id        UUID        NOT NULL REFERENCES queries(id) ON DELETE CASCADE,
@@ -185,6 +195,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 DROP TRIGGER IF EXISTS trg_documents_updated_at ON documents;
 CREATE TRIGGER trg_documents_updated_at
 BEFORE UPDATE ON documents
@@ -196,7 +211,7 @@ BEFORE UPDATE ON entities
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =====================================================================
--- Convenience view: full graph (nodes + edges)
+-- Convenience view
 -- =====================================================================
 CREATE OR REPLACE VIEW v_graph_edges AS
 SELECT
@@ -214,7 +229,7 @@ JOIN entities s ON s.id = r.source_entity_id
 JOIN entities t ON t.id = r.target_entity_id;
 
 -- =====================================================================
--- Seed LLM registry (optional, safe to re-run)
+-- Seed LLM registry
 -- =====================================================================
 INSERT INTO llms (model_id, display_name, provider, enabled, weight) VALUES
     ('gpt-5',           'GPT-5',          'OpenAI',    TRUE,  0.350),
