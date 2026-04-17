@@ -12,7 +12,7 @@ export const ConnectionStatus = () => {
           ? "border-primary/30 bg-primary-soft text-primary"
           : "border-destructive/30 bg-destructive/10 text-destructive"
       }`}
-      title={ok ? "Backend reachable" : "Backend unreachable — start with `cd backend && npm run dev`"}
+      title={ok ? "Backend reachable" : "Backend unreachable"}
     >
       {ok ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
       {isLoading ? "Checking…" : ok ? "Backend online" : "Backend offline"}
