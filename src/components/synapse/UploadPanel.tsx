@@ -125,7 +125,7 @@ const DocRow = ({ doc, onRemove }: { doc: Doc; onRemove: () => void }) => {
           <div className="mt-1.5 flex items-center gap-2">
             <Progress value={doc.progress} className="h-1" />
             <span className={`shrink-0 text-[10px] font-medium ${statusMeta.color}`}>
-              {doc.status !== "done" && <Loader2 className="mr-1 inline h-2.5 w-2.5 animate-spin" />}
+              <Loader2 className="mr-1 inline h-2.5 w-2.5 animate-spin" />
               {statusMeta.label} {doc.progress}%
             </span>
           </div>
