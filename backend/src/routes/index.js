@@ -1,5 +1,7 @@
 const { Router } = require("express");
+const requireAuth = require("../middleware/auth");
 
+const auth = require("./auth.routes");
 const documents = require("./documents.routes");
 const entities = require("./entities.routes");
 const relationships = require("./relationships.routes");
@@ -13,11 +15,13 @@ router.get("/health", (_req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
-router.use("/documents", documents);
-router.use("/entities", entities);
-router.use("/relationships", relationships);
-router.use("/graph", graph);
-router.use("/search", search);
-router.use("/orchestrator", orchestrator);
+router.use("/auth", auth);
+
+router.use("/documents", requireAuth, documents);
+router.use("/entities", requireAuth, entities);
+router.use("/relationships", requireAuth, relationships);
+router.use("/graph", requireAuth, graph);
+router.use("/search", requireAuth, search);
+router.use("/orchestrator", requireAuth, orchestrator);
 
 module.exports = router;

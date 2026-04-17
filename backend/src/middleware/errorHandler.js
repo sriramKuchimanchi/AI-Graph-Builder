@@ -1,9 +1,5 @@
-// Centralized error handler
 module.exports = function errorHandler(err, _req, res, _next) {
-  console.error("[error]", err);
+  console.error("[error]", err.message);
   const status = err.status || 500;
-  res.status(status).json({
-    error: err.message || "Internal Server Error",
-    ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
-  });
+  res.status(status).json({ error: err.message || "Internal Server Error" });
 };
