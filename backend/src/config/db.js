@@ -1,11 +1,3 @@
-/**
- * PostgreSQL connection pool.
- *
- * NOTE: This file does NOT eagerly connect on import. The pool is created
- * lazily so the server still boots even if Postgres is unreachable.
- * Call `query()` to actually use the database.
- */
-
 const { Pool } = require("pg");
 
 let pool = null;
@@ -21,22 +13,13 @@ function getPool() {
       max: 10,
       idleTimeoutMillis: 30000,
     });
-
-    pool.on("error", (err) => {
-      console.error("[pg] unexpected pool error:", err.message);
-    });
+    pool.on("error", (err) => console.error("[pg] pool error:", err.message));
   }
   return pool;
 }
 
 async function query(text, params) {
-  const start = Date.now();
-  const res = await getPool().query(text, params);
-  const duration = Date.now() - start;
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[pg]", { ms: duration, rows: res.rowCount, sql: text.split("\n")[0] });
-  }
-  return res;
+  return getPool().query(text, params);
 }
 
 module.exports = { getPool, query };
