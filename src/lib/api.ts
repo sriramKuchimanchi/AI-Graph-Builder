@@ -1,28 +1,41 @@
-// Hardcoded backend URL for local development.
-// Run the backend with: `cd backend && npm run dev`
-export const API_BASE_URL = "http://localhost:4000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+
+const TOKEN_KEY = "synapse.token";
+
+export const tokenStore = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/api${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    ...init,
-  });
+  const token = tokenStore.get();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/api${path}`, { ...init, headers });
+
+  if (res.status === 401) {
+    tokenStore.clear();
+  }
 
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
     try {
       const body = await res.json();
       if (body?.error) msg = body.error;
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
     throw new Error(msg);
   }
 
   return res.json() as Promise<T>;
 }
 
-// ---------- Types ----------
+export type AuthUser = { id: string; email: string; created_at: string };
+
 export type Document = {
   id: string;
   name: string;
@@ -92,9 +105,32 @@ export type SearchResult = {
   responses: LLMResponse[];
 };
 
-// ---------- API ----------
 export const api = {
   health: () => request<{ status: string; time: string }>("/health"),
+
+  auth: {
+    signup: (email: string, password: string) =>
+      request<{ user: AuthUser; token: string }>("/auth/signup", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
+    signin: (email: string, password: string) =>
+      request<{ user: AuthUser; token: string }>("/auth/signin", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
+    me: () => request<{ user: AuthUser }>("/auth/me"),
+    forgotPassword: (email: string) =>
+      request<{ ok: boolean; message: string; devToken?: string; expiresInMinutes?: number }>(
+        "/auth/forgot-password",
+        { method: "POST", body: JSON.stringify({ email }) }
+      ),
+    resetPassword: (token: string, password: string) =>
+      request<{ ok: boolean }>("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, password }),
+      }),
+  },
 
   documents: {
     list: () => request<{ data: Document[] }>("/documents"),
@@ -102,9 +138,11 @@ export const api = {
     upload: async (file: File) => {
       const fd = new FormData();
       fd.append("file", file);
+      const token = tokenStore.get();
       const res = await fetch(`${API_BASE_URL}/api/documents/upload`, {
         method: "POST",
         body: fd,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
       return res.json() as Promise<{ data: Document }>;
