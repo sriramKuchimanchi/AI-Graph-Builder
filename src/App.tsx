@@ -9,8 +9,6 @@ import Extraction from "./pages/Extraction";
 import Graph from "./pages/Graph";
 import OrchestratorPage from "./pages/OrchestratorPage";
 import SearchPage from "./pages/SearchPage";
-import Settings from "./pages/Settings";
-import Help from "./pages/Help";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -28,8 +26,6 @@ const App = () => (
           <Route path="/graph" element={<Graph />} />
           <Route path="/orchestrator" element={<OrchestratorPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/help" element={<Help />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
