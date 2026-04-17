@@ -12,19 +12,13 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Maximize2, Filter, RotateCcw } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { useGraph } from "@/lib/hooks";
 
-const EntityNode = ({ data }: NodeProps<{ label: string; type: string; primary?: boolean }>) => (
-  <div
-    className={`relative rounded-xl border px-4 py-2.5 shadow-soft transition-all ${
-      data.primary
-        ? "border-primary/50 bg-gradient-primary text-primary-foreground shadow-glow"
-        : "border-border bg-card hover:border-primary/40"
-    }`}
-  >
+const EntityNode = ({ data }: NodeProps<{ label: string; type: string }>) => (
+  <div className="relative rounded-xl border border-border bg-card px-4 py-2.5 shadow-soft transition-all hover:border-primary/40">
     <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-primary/40" />
-    <div className={`text-[10px] font-medium uppercase tracking-wider ${data.primary ? "opacity-80" : "text-muted-foreground"}`}>
+    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
       {data.type}
     </div>
     <div className="text-sm font-semibold">{data.label}</div>
@@ -34,75 +28,87 @@ const EntityNode = ({ data }: NodeProps<{ label: string; type: string; primary?:
 
 const nodeTypes = { entity: EntityNode };
 
+// Simple radial layout so the graph isn't all stacked at (0,0)
+const layoutNodes = (ids: string[]): Record<string, { x: number; y: number }> => {
+  const out: Record<string, { x: number; y: number }> = {};
+  const radius = Math.max(180, ids.length * 30);
+  ids.forEach((id, i) => {
+    const angle = (i / ids.length) * Math.PI * 2;
+    out[id] = { x: 400 + radius * Math.cos(angle), y: 260 + radius * Math.sin(angle) };
+  });
+  return out;
+};
+
 export const GraphView = () => {
-  const nodes: Node[] = useMemo(
-    () => [
-      { id: "1", type: "entity", position: { x: 350, y: 30 }, data: { label: "OpenAI", type: "Organization", primary: true } },
-      { id: "2", type: "entity", position: { x: 80, y: 160 }, data: { label: "Sam Altman", type: "Person" } },
-      { id: "3", type: "entity", position: { x: 350, y: 200 }, data: { label: "GPT-5", type: "Product" } },
-      { id: "4", type: "entity", position: { x: 620, y: 160 }, data: { label: "San Francisco", type: "Location" } },
-      { id: "5", type: "entity", position: { x: 350, y: 360 }, data: { label: "Q3 2025", type: "Date" } },
-      { id: "6", type: "entity", position: { x: 100, y: 340 }, data: { label: "Anthropic", type: "Organization" } },
-      { id: "7", type: "entity", position: { x: 620, y: 340 }, data: { label: "Claude Opus", type: "Product" } },
-    ],
-    []
-  );
+  const { data, isLoading, isError } = useGraph();
 
-  const edges: Edge[] = useMemo(
-    () => [
-      { id: "e1-2", source: "2", target: "1", label: "leads", animated: true },
-      { id: "e1-3", source: "1", target: "3", label: "released", animated: true },
-      { id: "e1-4", source: "1", target: "4", label: "located in" },
-      { id: "e3-5", source: "3", target: "5", label: "launched" },
-      { id: "e6-7", source: "6", target: "7", label: "developed" },
-      { id: "e1-6", source: "1", target: "6", label: "competes with", style: { strokeDasharray: "5 5" } },
-    ],
-    []
-  );
-
-  const styledEdges = edges.map((e) => ({
-    ...e,
-    style: { stroke: "hsl(var(--primary))", strokeWidth: 1.5, ...e.style },
-    labelStyle: { fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 500 },
-    labelBgStyle: { fill: "hsl(var(--background))" },
-    labelBgPadding: [4, 2] as [number, number],
-  }));
+  const { nodes, edges } = useMemo(() => {
+    if (!data) return { nodes: [] as Node[], edges: [] as Edge[] };
+    const positions = layoutNodes(data.nodes.map((n) => n.id));
+    const nodes: Node[] = data.nodes.map((n) => ({
+      id: n.id,
+      type: "entity",
+      position: positions[n.id],
+      data: { label: n.label, type: n.type },
+    }));
+    const edges: Edge[] = data.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.predicate,
+      animated: Number(e.confidence) > 0.9,
+      type: "smoothstep",
+      style: { stroke: "hsl(var(--primary))", strokeWidth: 1.5 },
+      labelStyle: { fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 500 },
+      labelBgStyle: { fill: "hsl(var(--background))" },
+      labelBgPadding: [4, 2] as [number, number],
+    }));
+    return { nodes, edges };
+  }, [data]);
 
   return (
     <Card className="overflow-hidden border-border/60 shadow-soft">
       <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-5 py-3.5">
         <div>
           <h3 className="font-display text-base font-semibold">Knowledge Graph</h3>
-          <p className="text-xs text-muted-foreground">Interactive view — drag nodes, zoom, pan</p>
+          <p className="text-xs text-muted-foreground">Live from the database</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="font-mono text-[10px]">
-            7 nodes · 6 edges
-          </Badge>
-          <Button size="icon" variant="outline" className="h-8 w-8">
-            <Filter className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="outline" className="h-8 w-8">
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="outline" className="h-8 w-8">
-            <Maximize2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        <Badge variant="secondary" className="font-mono text-[10px]">
+          {nodes.length} nodes · {edges.length} edges
+        </Badge>
       </div>
 
-      <div className="h-[520px] w-full bg-gradient-soft">
-        <ReactFlow
-          nodes={nodes}
-          edges={styledEdges}
-          nodeTypes={nodeTypes}
-          fitView
-          proOptions={{ hideAttribution: true }}
-          defaultEdgeOptions={{ type: "smoothstep" }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="hsl(var(--border))" />
-          <Controls className="!rounded-lg !border !border-border !bg-card !shadow-soft [&>button]:!border-border [&>button]:!bg-card" />
-        </ReactFlow>
+      <div className="relative h-[520px] w-full bg-gradient-soft">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading graph…
+          </div>
+        )}
+        {isError && (
+          <div className="absolute inset-0 flex items-center justify-center px-6">
+            <div className="flex max-w-md items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Backend unreachable. Start it with <code className="font-mono">cd backend && npm run dev</code>.
+            </div>
+          </div>
+        )}
+        {!isLoading && !isError && nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+            No entities yet. Upload documents and seed extraction to populate the graph.
+          </div>
+        )}
+        {nodes.length > 0 && (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="hsl(var(--border))" />
+            <Controls className="!rounded-lg !border !border-border !bg-card !shadow-soft [&>button]:!border-border [&>button]:!bg-card" />
+          </ReactFlow>
+        )}
       </div>
     </Card>
   );

@@ -1,83 +1,55 @@
 # Synapse Backend (Node.js + Express + PostgreSQL)
 
-Standalone backend scaffold for the **AI Knowledge Graph Builder** project.
-This is **not connected** to the frontend — it's a pure skeleton you can run, extend, and wire up yourself.
+Standalone backend for the **AI Knowledge Graph Builder**.
+Pure Node + Postgres — no Supabase, no Lovable Cloud.
 
-## Stack
-
-- **Node.js** + **Express** (REST API)
-- **PostgreSQL** (via `pg` driver) — managed locally through **pgAdmin 4**
-- **Multer** for file uploads
-- **dotenv** for config
-
-## Project structure
-
-```
-backend/
-├── package.json
-├── .env.example
-├── server.js                 # Entry point
-├── src/
-│   ├── config/
-│   │   └── db.js             # Postgres pool (no auto-connect; lazy)
-│   ├── middleware/
-│   │   ├── errorHandler.js
-│   │   └── upload.js         # Multer config for document uploads
-│   ├── controllers/
-│   │   ├── documents.controller.js
-│   │   ├── entities.controller.js
-│   │   ├── relationships.controller.js
-│   │   ├── graph.controller.js
-│   │   ├── search.controller.js
-│   │   └── orchestrator.controller.js
-│   ├── routes/
-│   │   ├── index.js
-│   │   ├── documents.routes.js
-│   │   ├── entities.routes.js
-│   │   ├── relationships.routes.js
-│   │   ├── graph.routes.js
-│   │   ├── search.routes.js
-│   │   └── orchestrator.routes.js
-│   └── services/
-│       ├── extraction.service.js     # Stub: entity/relation extraction
-│       ├── llm.service.js            # Stub: per-LLM clients
-│       └── synthesizer.service.js    # Stub: merges multi-LLM responses
-└── db/
-    └── schema.sql            # Run this in pgAdmin 4
-```
-
-## Setup
+## Quick start
 
 ```bash
 cd backend
 npm install
-cp .env.example .env       # then edit DB credentials
-npm run dev
+cp .env.example .env       # edit DB credentials if needed
+npm run dev                # starts on http://localhost:4000
 ```
 
 ## Database setup (pgAdmin 4)
 
 1. Open pgAdmin 4 → right-click **Databases** → **Create → Database…** → name it `synapse`.
-2. Right-click the new `synapse` database → **Query Tool**.
+2. Right-click `synapse` → **Query Tool**.
 3. Open `backend/db/schema.sql`, paste the contents, and run it (F5).
-4. Confirm the tables appear under `synapse → Schemas → public → Tables`.
+4. (Optional) Run `backend/db/seed.sql` for sample data so the frontend has something to display.
 
-## API endpoints (skeleton)
+## How the connection works
 
-| Method | Path                                | Purpose                              |
+- The backend reads `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` from `.env`.
+- `src/config/db.js` creates a lazy `pg` Pool — the server boots even if Postgres is offline.
+- All controllers now run **real SQL** against the schema.
+
+## API endpoints
+
+| Method | Path                                | Returns                              |
 |--------|-------------------------------------|--------------------------------------|
-| GET    | `/api/health`                       | Service heartbeat                    |
-| POST   | `/api/documents/upload`             | Upload a document                    |
-| GET    | `/api/documents`                    | List documents                       |
-| GET    | `/api/documents/:id`                | Get one document                     |
-| DELETE | `/api/documents/:id`                | Delete a document                    |
-| GET    | `/api/entities`                     | List extracted entities              |
-| GET    | `/api/entities/:id`                 | Get one entity                       |
-| GET    | `/api/relationships`                | List extracted relationships         |
-| GET    | `/api/graph`                        | Full graph (nodes + edges)           |
+| GET    | `/api/health`                       | `{status, time}`                     |
+| GET    | `/api/documents`                    | All documents                        |
+| GET    | `/api/documents/:id`                | One document                         |
+| POST   | `/api/documents/upload`             | Inserts a row + saves file to disk   |
+| DELETE | `/api/documents/:id`                | Deletes a document                   |
+| GET    | `/api/entities?type=&search=`       | Filtered entities                    |
+| GET    | `/api/entities/:id`                 | One entity                           |
+| GET    | `/api/relationships`                | All relationships (joined w/ names)  |
+| GET    | `/api/graph`                        | `{nodes, edges}` for visualization   |
 | GET    | `/api/graph/:entityId/neighbors`    | Neighbors of an entity               |
-| POST   | `/api/search`                       | Semantic / NL query over graph       |
-| GET    | `/api/orchestrator/llms`            | List configured LLMs                 |
-| POST   | `/api/orchestrator/query`           | Fan-out + synthesize                 |
+| POST   | `/api/search`  body `{q}`           | NL query → synthesized answer        |
+| GET    | `/api/orchestrator/llms`            | LLM registry from DB                 |
+| POST   | `/api/orchestrator/query` `{prompt}`| Fan-out + synthesizer                |
 
-All controllers currently return mock JSON or `501 Not Implemented` placeholders.
+## Frontend → Backend
+
+The React app talks to `http://localhost:4000/api/...` (hardcoded in `src/lib/api.ts`).
+Run the backend first, then the frontend.
+
+## LLM service
+
+`src/services/llm.service.js` is still a stub that returns deterministic mock responses,
+so the orchestrator + synthesizer flow works end-to-end without any API keys.
+Drop in real OpenAI / Anthropic / Gemini calls when you're ready.
