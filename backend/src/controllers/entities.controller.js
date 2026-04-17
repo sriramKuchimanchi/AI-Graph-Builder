@@ -1,19 +1,35 @@
-// const { query } = require("../config/db");
+const { query } = require("../config/db");
 
-exports.list = async (_req, res, next) => {
+exports.list = async (req, res, next) => {
   try {
-    // const { rows } = await query("SELECT * FROM entities ORDER BY name");
-    res.json({
-      data: [
-        { id: 1, name: "OpenAI", type: "Organization", mention_count: 28 },
-        { id: 2, name: "Sam Altman", type: "Person", mention_count: 19 },
-      ],
-    });
+    const { type, search, limit = 200 } = req.query;
+    const params = [];
+    const where = [];
+
+    if (type) { params.push(type); where.push(`type = $${params.length}`); }
+    if (search) { params.push(`%${search.toLowerCase()}%`); where.push(`LOWER(name) LIKE $${params.length}`); }
+
+    params.push(Math.min(parseInt(limit, 10) || 200, 1000));
+    const sql = `
+      SELECT id, name, type, description, mention_count, properties, created_at
+      FROM entities
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
+      ORDER BY mention_count DESC, name ASC
+      LIMIT $${params.length}`;
+
+    const { rows } = await query(sql, params);
+    res.json({ data: rows });
   } catch (e) { next(e); }
 };
 
 exports.getOne = async (req, res, next) => {
   try {
-    res.json({ data: { id: req.params.id, name: "OpenAI", type: "Organization" } });
+    const { rows } = await query(
+      `SELECT id, name, type, description, mention_count, properties, created_at, updated_at
+       FROM entities WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Entity not found" });
+    res.json({ data: rows[0] });
   } catch (e) { next(e); }
 };
