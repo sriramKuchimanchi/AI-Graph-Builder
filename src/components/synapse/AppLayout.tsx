@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/synapse/AppSidebar";
+import { ConnectionStatus } from "@/components/synapse/ConnectionStatus";
 
 interface Props {
   title: string;
@@ -19,6 +20,9 @@ export const AppLayout = ({ title, eyebrow, description, actions, children }: Pr
         <div className="flex flex-1 flex-col">
           <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
             <SidebarTrigger className="-ml-1" />
+            <div className="ml-auto">
+              <ConnectionStatus />
+            </div>
           </header>
 
           <main className="flex-1 overflow-y-auto">
