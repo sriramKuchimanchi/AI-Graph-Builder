@@ -88,7 +88,7 @@ export const GraphView = () => {
           <div className="absolute inset-0 flex items-center justify-center px-6">
             <div className="flex max-w-md items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              Backend unreachable. Start it with <code className="font-mono">cd backend && npm run dev</code>.
+              Backend unreachable.
             </div>
           </div>
         )}

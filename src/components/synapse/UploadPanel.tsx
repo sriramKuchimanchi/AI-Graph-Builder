@@ -75,11 +75,8 @@ export const UploadPanel = () => {
             <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
               <AlertCircle className="h-4 w-4" />
               <div>
-                <div className="font-medium">Could not reach the backend.</div>
+                <div className="font-medium">Could not load documents.</div>
                 <div className="text-destructive/80">{(error as Error)?.message}</div>
-                <div className="mt-1 font-mono text-[10px] text-destructive/70">
-                  Run: cd backend && npm run dev
-                </div>
               </div>
             </div>
           )}

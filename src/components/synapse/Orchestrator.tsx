@@ -35,7 +35,7 @@ export const Orchestrator = () => {
         {isError && (
           <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
             <AlertCircle className="h-4 w-4" />
-            Backend unreachable. Start it with <code className="font-mono">cd backend && npm run dev</code>.
+            Backend unreachable.
           </div>
         )}
 
