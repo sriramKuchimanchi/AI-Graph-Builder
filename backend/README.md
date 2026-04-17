@@ -1,55 +1,66 @@
-# Synapse Backend (Node.js + Express + PostgreSQL)
+# Synapse Backend — Node.js + Express + PostgreSQL
 
-Standalone backend for the **AI Knowledge Graph Builder**.
-Pure Node + Postgres — no Supabase, no Lovable Cloud.
+Backend for the **AI Knowledge Graph Builder** with JWT auth, document ingest,
+graph queries, and a multi-LLM orchestrator stub.
 
 ## Quick start
 
 ```bash
 cd backend
 npm install
-cp .env.example .env       # edit DB credentials if needed
-npm run dev                # starts on http://localhost:4000
+cp .env.example .env       # edit DB credentials + JWT_SECRET
+npm run dev                # http://localhost:4000
 ```
 
 ## Database setup (pgAdmin 4)
 
-1. Open pgAdmin 4 → right-click **Databases** → **Create → Database…** → name it `synapse`.
+1. Right-click **Databases** → **Create → Database…** → name it `synapse`.
 2. Right-click `synapse` → **Query Tool**.
-3. Open `backend/db/schema.sql`, paste the contents, and run it (F5).
-4. (Optional) Run `backend/db/seed.sql` for sample data so the frontend has something to display.
+3. Open `backend/db/schema.sql`, paste, run (F5).
+4. (Optional) Run `backend/db/seed.sql` for demo data.
 
-## How the connection works
+## Environment variables
 
-- The backend reads `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` from `.env`.
-- `src/config/db.js` creates a lazy `pg` Pool — the server boots even if Postgres is offline.
-- All controllers now run **real SQL** against the schema.
+| Var                       | Purpose                                 |
+|---------------------------|-----------------------------------------|
+| `PORT`                    | API port (default 4000)                 |
+| `CORS_ORIGIN`             | Frontend origin (default `*`)           |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` | Postgres connection |
+| `JWT_SECRET`              | **Change this in production**           |
+| `JWT_EXPIRES_IN`          | e.g. `7d`                               |
+| `RESET_TOKEN_EXPIRES_MIN` | Forgot-password token lifetime          |
+| `UPLOAD_DIR`              | Where uploaded files are stored         |
+| `MAX_UPLOAD_MB`           | Upload size cap                         |
 
 ## API endpoints
 
-| Method | Path                                | Returns                              |
-|--------|-------------------------------------|--------------------------------------|
-| GET    | `/api/health`                       | `{status, time}`                     |
-| GET    | `/api/documents`                    | All documents                        |
-| GET    | `/api/documents/:id`                | One document                         |
-| POST   | `/api/documents/upload`             | Inserts a row + saves file to disk   |
-| DELETE | `/api/documents/:id`                | Deletes a document                   |
-| GET    | `/api/entities?type=&search=`       | Filtered entities                    |
-| GET    | `/api/entities/:id`                 | One entity                           |
-| GET    | `/api/relationships`                | All relationships (joined w/ names)  |
-| GET    | `/api/graph`                        | `{nodes, edges}` for visualization   |
-| GET    | `/api/graph/:entityId/neighbors`    | Neighbors of an entity               |
-| POST   | `/api/search`  body `{q}`           | NL query → synthesized answer        |
-| GET    | `/api/orchestrator/llms`            | LLM registry from DB                 |
-| POST   | `/api/orchestrator/query` `{prompt}`| Fan-out + synthesizer                |
+### Auth (public)
+| Method | Path                          | Body                         |
+|--------|-------------------------------|------------------------------|
+| POST   | `/api/auth/signup`            | `{ email, password }`        |
+| POST   | `/api/auth/signin`            | `{ email, password }`        |
+| POST   | `/api/auth/forgot-password`   | `{ email }` → returns token  |
+| POST   | `/api/auth/reset-password`    | `{ token, password }`        |
+| GET    | `/api/auth/me`                | (Bearer token)               |
 
-## Frontend → Backend
+### Protected (require `Authorization: Bearer <token>`)
+| Method | Path                                | Returns                   |
+|--------|-------------------------------------|---------------------------|
+| GET    | `/api/documents`                    | All documents             |
+| POST   | `/api/documents/upload`             | Multipart upload          |
+| DELETE | `/api/documents/:id`                | Delete a document         |
+| GET    | `/api/entities?type=&search=`       | Filtered entities         |
+| GET    | `/api/relationships`                | All relationships         |
+| GET    | `/api/graph`                        | `{nodes, edges}`          |
+| GET    | `/api/graph/:entityId/neighbors`    | Neighbors of an entity    |
+| POST   | `/api/search`  `{q}`                | Synthesized answer        |
+| GET    | `/api/orchestrator/llms`            | LLM registry              |
+| POST   | `/api/orchestrator/query` `{prompt}`| Fan-out + synthesizer     |
 
-The React app talks to `http://localhost:4000/api/...` (hardcoded in `src/lib/api.ts`).
-Run the backend first, then the frontend.
+`/api/health` is open and returns `{status, time}`.
 
-## LLM service
+## Notes on the forgot-password flow
 
-`src/services/llm.service.js` is still a stub that returns deterministic mock responses,
-so the orchestrator + synthesizer flow works end-to-end without any API keys.
-Drop in real OpenAI / Anthropic / Gemini calls when you're ready.
+For a college demo there's no SMTP. `POST /api/auth/forgot-password` returns
+the reset token in the response (`devToken`) so you can copy it into the
+`/reset-password` page in the frontend.
