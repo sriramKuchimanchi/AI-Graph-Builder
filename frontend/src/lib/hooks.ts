@@ -15,6 +15,13 @@ export const useDocuments = () =>
     queryKey: ["documents"],
     queryFn: api.documents.list,
     select: (r) => r.data,
+    refetchInterval: (query) => {
+      const raw = query.state.data as { data: Array<{ status: string }> } | undefined;
+      const docs = raw?.data;
+      if (!docs) return false;
+      const isProcessing = docs.some((d) => d.status === "parsing" || d.status === "extracting");
+      return isProcessing ? 2000 : false;
+    },
   });
 
 export const useUploadDocument = () => {
@@ -23,7 +30,11 @@ export const useUploadDocument = () => {
     mutationFn: (file: File) => api.documents.upload(file),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["documents"] });
-      toast.success("Document uploaded");
+      toast.success("Document uploaded — processing started");
+      // Poll for 30s after upload to catch the status transitions
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["documents"] }), 3000);
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["documents"] }), 8000);
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["documents"] }), 15000);
     },
     onError: (e: Error) => toast.error(e.message),
   });

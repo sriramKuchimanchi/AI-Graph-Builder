@@ -28,7 +28,6 @@ const EntityNode = ({ data }: NodeProps<{ label: string; type: string }>) => (
 
 const nodeTypes = { entity: EntityNode };
 
-// Simple radial layout so the graph isn't all stacked at (0,0)
 const layoutNodes = (ids: string[]): Record<string, { x: number; y: number }> => {
   const out: Record<string, { x: number; y: number }> = {};
   const radius = Math.max(180, ids.length * 30);

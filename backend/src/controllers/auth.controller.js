@@ -6,9 +6,12 @@ const { query } = require("../config/db");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function signToken(user) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET environment variable is required");
+  }
   return jwt.sign(
     { sub: user.id, email: user.email },
-    process.env.JWT_SECRET || "dev-secret",
+    process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
   );
 }
@@ -92,7 +95,6 @@ exports.forgotPassword = async (req, res, next) => {
       [rows[0].id, tokenHash, String(minutes)]
     );
 
-    // For a college demo we return the token directly so there's no SMTP needed.
     res.json({ ...response, devToken: token, expiresInMinutes: minutes });
   } catch (e) { next(e); }
 };

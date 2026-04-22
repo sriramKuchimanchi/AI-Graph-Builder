@@ -7,27 +7,23 @@ exports.query = async (req, res, next) => {
     const { q } = req.body || {};
     if (!q || typeof q !== "string") return res.status(400).json({ error: "Missing 'q'" });
 
-    // 1) Persist the query
     const { rows: [queryRow] } = await query(
-      `INSERT INTO queries (prompt) VALUES ($1) RETURNING id`,
-      [q]
+      `INSERT INTO queries (user_id, prompt) VALUES ($1, $2) RETURNING id`,
+      [req.user.sub, q]
     );
 
-    // 2) Naive entity match against the graph (substring) — replace with embeddings later
     const { rows: matchedEntities } = await query(
       `SELECT id, name, type
        FROM entities
-       WHERE LOWER(name) LIKE '%' || LOWER($1) || '%'
+       WHERE user_id = $1 AND LOWER(name) LIKE '%' || LOWER($2) || '%'
        ORDER BY mention_count DESC
        LIMIT 10`,
-      [q.split(" ").slice(0, 1)[0] || q]
+      [req.user.sub, q.split(" ").slice(0, 1)[0] || q]
     );
 
-    // 3) Fan out to LLMs and synthesize
     const responses = await llm.fanOut(q);
     const synthesized = await synthesizer.merge(responses);
 
-    // 4) Persist synthesized answer
     await query(
       `UPDATE queries
        SET synthesized_answer = $1, confidence = $2, synthesizer_strategy = $3

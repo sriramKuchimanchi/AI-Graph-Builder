@@ -18,7 +18,6 @@ exports.query = async (req, res, next) => {
     const { prompt, models } = req.body || {};
     if (!prompt) return res.status(400).json({ error: "Missing 'prompt'" });
 
-    // Resolve enabled models from DB if none specified
     let modelList = models;
     if (!modelList || !modelList.length) {
       const { rows } = await query(

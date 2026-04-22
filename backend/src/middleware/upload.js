@@ -16,6 +16,12 @@ const storage = multer.diskStorage({
 });
 
 const allowed = [".pdf", ".docx", ".txt", ".md"];
+const allowedMimes = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "text/markdown",
+];
 
 const upload = multer({
   storage,
@@ -24,9 +30,18 @@ const upload = multer({
   },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!allowed.includes(ext)) {
+    
+    const isValidExt = allowed.includes(ext);
+    const isValidMime = allowedMimes.includes(file.mimetype);
+
+    if (!isValidExt) {
       return cb(new Error(`Unsupported file type: ${ext}`));
     }
+
+    if (!isValidMime) {
+      return cb(new Error(`Invalid MIME type: ${file.mimetype}`));
+    }
+
     cb(null, true);
   },
 });
