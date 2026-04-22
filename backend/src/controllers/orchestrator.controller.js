@@ -13,6 +13,23 @@ exports.listLLMs = async (_req, res, next) => {
   } catch (e) { next(e); }
 };
 
+exports.toggleLLM = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "'enabled' must be a boolean" });
+    }
+    const { rows } = await query(
+      `UPDATE llms SET enabled = $1 WHERE id = $2
+       RETURNING id, model_id, display_name, provider, enabled, weight`,
+      [enabled, id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "LLM not found" });
+    res.json({ data: rows[0] });
+  } catch (e) { next(e); }
+};
+
 exports.query = async (req, res, next) => {
   try {
     const { prompt, models } = req.body || {};

@@ -79,6 +79,16 @@ export const useLLMs = () =>
     select: (r) => r.data,
   });
 
+export const useToggleLLM = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      api.orchestrator.toggleLLM(id, enabled),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["llms"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
 export const useSearch = () =>
   useMutation({
     mutationFn: (q: string) => api.search.query(q),

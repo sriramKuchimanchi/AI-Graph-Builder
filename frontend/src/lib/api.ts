@@ -181,6 +181,11 @@ export const api = {
   },
 
   orchestrator: {
-    listLLMs: () => request<{ data: LLM[] }>("/orchestrator/llms"),
-  },
+  listLLMs: () => request<{ data: LLM[] }>("/orchestrator/llms"),
+  toggleLLM: (id: string, enabled: boolean) =>
+    request<{ data: LLM }>(`/orchestrator/llms/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }),
+},
 };

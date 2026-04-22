@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Cpu, Sparkles, Brain, Zap, GitMerge, Loader2, AlertCircle } from "lucide-react";
-import { useLLMs } from "@/lib/hooks";
+import { useLLMs, useToggleLLM } from "@/lib/hooks";
 
 const providerIcon: Record<string, React.ElementType> = {
   OpenAI: Sparkles,
@@ -13,6 +13,7 @@ const providerIcon: Record<string, React.ElementType> = {
 
 export const Orchestrator = () => {
   const { data: llms, isLoading, isError } = useLLMs();
+  const toggleLLM = useToggleLLM();
 
   return (
     <Card className="overflow-hidden border-border/60 shadow-soft">
@@ -62,7 +63,13 @@ export const Orchestrator = () => {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1.5">
-                <Switch defaultChecked={llm.enabled} />
+                <Switch
+                  checked={llm.enabled}
+                  disabled={toggleLLM.isPending}
+                  onCheckedChange={(enabled) =>
+                    toggleLLM.mutate({ id: llm.id, enabled })
+                  }
+                />
                 <span
                   className={`text-[10px] font-medium uppercase tracking-wider ${
                     llm.enabled ? "text-primary" : "text-muted-foreground"
