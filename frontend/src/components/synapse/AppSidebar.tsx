@@ -51,16 +51,10 @@ export const AppSidebar = () => {
     <Sidebar collapsible="icon" className="border-r border-border/60">
       <SidebarHeader className="border-b border-border/60 p-3">
         <div className="flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
-            <Network className="h-5 w-5 text-primary-foreground" strokeWidth={2.5} />
-          </div>
           {!collapsed && (
             <div className="flex min-w-0 flex-col leading-tight">
               <span className="truncate font-display text-base font-bold tracking-tight">
-                Synapse
-              </span>
-              <span className="truncate text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                Knowledge Graph
+                AI-Graph
               </span>
             </div>
           )}
