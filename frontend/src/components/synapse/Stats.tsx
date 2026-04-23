@@ -11,7 +11,7 @@ export const Stats = () => {
     { label: "Documents",    value: docs.data?.length, icon: FileText, loading: docs.isLoading },
     { label: "Entities",     value: ents.data?.length, icon: Database, loading: ents.isLoading },
     { label: "Relationships",value: rels.data?.length, icon: Workflow, loading: rels.isLoading },
-    { label: "LLMs",         value: 4,                 icon: Sparkles, loading: false },
+    { label: "LLMs",         value: 1,                 icon: Sparkles, loading: false },
   ];
 
   return (

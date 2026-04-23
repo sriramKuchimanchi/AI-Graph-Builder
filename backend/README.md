@@ -1,6 +1,6 @@
 # Synapse — AI Knowledge Graph Builder
 
-A full-stack application that ingests documents, extracts entities and relationships using LLMs, visualizes them as an interactive knowledge graph, and answers natural language queries by synthesizing responses from multiple AI models.
+A full-stack application that ingests documents, extracts entities and relationships using LLMs, visualizes them as an interactive knowledge graph, and answers natural language queries grounded in your document content.
 
 ---
 
@@ -21,12 +21,12 @@ A full-stack application that ingests documents, extracts entities and relations
 
 ## Features
 
-- **Document Ingestion** — Upload PDF, DOCX, TXT, and MD files (up to 50 MB)
-- **Entity & Relationship Extraction** — LLM-powered extraction via Groq (llama-3.1-8b-instant) with regex fallback
-- **Knowledge Graph Visualization** — Interactive graph using React Flow
-- **Multi-LLM Orchestration** — Fan-out queries to OpenAI, Anthropic, Google, and Meta models
-- **Semantic Search** — Natural language queries synthesized across all enabled LLMs
-- **Authentication** — JWT-based sign up, sign in, forgot/reset password flow
+- **Document Ingestion** — Upload PDF, DOCX, TXT, or MD files (up to 50 MB). Each new upload automatically replaces all previous data.
+- **LLM Entity & Relationship Extraction** — Uses Groq (llama-3.1-8b-instant) to extract named entities and relationships from document chunks. Falls back to regex if no API key is set.
+- **Knowledge Graph Visualization** — Interactive dagre-layout graph with color-coded entity types, minimap, zoom controls, and working fullscreen.
+- **Document-Grounded Search** — Natural language queries answered using only the content from your uploaded documents. The LLM is given your graph and document chunks as context.
+- **LLM Orchestrator** — Toggle models on/off. Changes persist to the database.
+- **Authentication** — JWT-based sign up, sign in, forgot/reset password flow.
 
 ---
 
@@ -39,7 +39,7 @@ A full-stack application that ingests documents, extracts entities and relations
 | Vite | Build tool |
 | React Router v6 | Client-side routing |
 | TanStack Query v5 | Server state, caching, polling |
-| React Flow | Knowledge graph visualization |
+| React Flow + @dagrejs/dagre | Knowledge graph visualization with automatic layout |
 | Tailwind CSS + shadcn/ui | Styling and components |
 | Sonner | Toast notifications |
 
@@ -48,12 +48,12 @@ A full-stack application that ingests documents, extracts entities and relations
 |---|---|
 | Node.js + Express | HTTP server |
 | PostgreSQL (pg) | Primary database |
-| pdfjs-dist | PDF text extraction (Node-compatible) |
+| pdfjs-dist | PDF text extraction (Node/Windows compatible) |
 | mammoth | DOCX text extraction |
 | bcryptjs | Password hashing |
 | jsonwebtoken | JWT auth |
 | multer | File upload handling |
-| Groq API | LLM extraction & search (llama-3.1-8b-instant) |
+| Groq API (llama-3.1-8b-instant) | Entity extraction + document-grounded search |
 
 ---
 
@@ -64,19 +64,18 @@ graph-weaver-pro/
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── synapse/
-│       │   │   ├── AppLayout.tsx        # Main layout wrapper
-│       │   │   ├── AppSidebar.tsx       # Navigation sidebar
-│       │   │   ├── AuthShell.tsx        # Auth page wrapper
-│       │   │   ├── ConnectionStatus.tsx # Backend health indicator
-│       │   │   ├── ExtractionPanel.tsx  # Entity/relationship viewer
-│       │   │   ├── GraphView.tsx        # React Flow graph
-│       │   │   ├── Orchestrator.tsx     # LLM model cards
-│       │   │   ├── ProtectedRoute.tsx   # Auth guard
-│       │   │   ├── SearchPanel.tsx      # Semantic search UI
-│       │   │   ├── Stats.tsx            # Overview stats cards
-│       │   │   └── UploadPanel.tsx      # Document upload UI
-│       │   └── ui/                      # shadcn/ui components
+│       │   └── synapse/
+│       │       ├── AppLayout.tsx        # Main layout wrapper
+│       │       ├── AppSidebar.tsx       # Navigation sidebar
+│       │       ├── AuthShell.tsx        # Auth page wrapper
+│       │       ├── ConnectionStatus.tsx # Backend health indicator
+│       │       ├── ExtractionPanel.tsx  # Entity/relationship viewer
+│       │       ├── GraphView.tsx        # React Flow + dagre graph
+│       │       ├── Orchestrator.tsx     # LLM model cards with working toggle
+│       │       ├── ProtectedRoute.tsx   # Auth guard
+│       │       ├── SearchPanel.tsx      # Semantic search UI
+│       │       ├── Stats.tsx            # Overview stats cards
+│       │       └── UploadPanel.tsx      # Document upload UI
 │       ├── lib/
 │       │   ├── api.ts                   # All API calls
 │       │   ├── auth.tsx                 # Auth context & provider
@@ -97,35 +96,35 @@ graph-weaver-pro/
 └── backend/
     └── src/
         ├── config/
-        │   └── db.js                    # PostgreSQL pool
+        │   └── db.js                       # PostgreSQL pool
         ├── controllers/
-        │   ├── auth.controller.js       # Signup, signin, reset
-        │   ├── documents.controller.js  # Upload, list, delete + auto-process
-        │   ├── entities.controller.js   # Entity listing
-        │   ├── graph.controller.js      # Graph nodes & edges
-        │   ├── orchestrator.controller.js # LLM management
-        │   ├── processor.controller.js  # Manual reprocess trigger
+        │   ├── auth.controller.js           # Signup, signin, reset
+        │   ├── documents.controller.js      # Upload (auto-clears previous data), list, delete
+        │   ├── entities.controller.js       # Entity listing
+        │   ├── graph.controller.js          # Graph nodes & edges (filtered by user)
+        │   ├── orchestrator.controller.js   # LLM listing + toggle
+        │   ├── processor.controller.js      # Manual reprocess trigger
         │   ├── relationships.controller.js
-        │   └── search.controller.js     # Semantic query
+        │   └── search.controller.js         # Document-grounded semantic query
         ├── middleware/
-        │   ├── auth.js                  # JWT verification
+        │   ├── auth.js                      # JWT verification
         │   ├── errorHandler.js
-        │   ├── rateLimit.js             # In-memory rate limiting
-        │   └── upload.js                # Multer config
+        │   ├── rateLimit.js                 # In-memory rate limiting
+        │   └── upload.js                    # Multer config
         ├── routes/
-        │   ├── index.js                 # Route aggregator
+        │   ├── index.js
         │   ├── auth.routes.js
         │   ├── documents.routes.js
         │   ├── entities.routes.js
         │   ├── graph.routes.js
-        │   ├── orchestrator.routes.js
+        │   ├── orchestrator.routes.js       # Includes PATCH /llms/:id
         │   ├── processor.routes.js
         │   ├── relationships.routes.js
         │   └── search.routes.js
         └── services/
-            ├── extraction.service.js    # PDF parsing + LLM entity extraction
-            ├── llm.service.js           # Multi-provider LLM fan-out
-            └── synthesizer.service.js  # Weighted-consensus merge
+            ├── extraction.service.js        # pdfjs-dist PDF parsing + Groq entity extraction
+            ├── llm.service.js               # Multi-provider LLM fan-out with Groq fallback
+            └── synthesizer.service.js       # Weighted-consensus merge
 ```
 
 ---
@@ -133,10 +132,8 @@ graph-weaver-pro/
 ## Database Schema
 
 ```sql
--- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Enums
 CREATE TYPE document_status AS ENUM ('queued', 'parsing', 'extracting', 'indexed', 'failed');
 CREATE TYPE entity_type     AS ENUM ('Person', 'Organization', 'Location', 'Product', 'Date', 'Event', 'Concept', 'Other');
 CREATE TYPE llm_provider    AS ENUM ('OpenAI', 'Anthropic', 'Google', 'Meta', 'Other');
@@ -175,6 +172,9 @@ CREATE TABLE documents (
     created_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_documents_user_id    ON documents(user_id);
+CREATE INDEX idx_documents_status     ON documents(status);
+CREATE INDEX idx_documents_created_at ON documents(created_at DESC);
 
 -- Text chunks extracted from documents
 CREATE TABLE document_chunks (
@@ -187,6 +187,7 @@ CREATE TABLE document_chunks (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (document_id, chunk_index)
 );
+CREATE INDEX idx_chunks_document_id ON document_chunks(document_id);
 
 -- Named entities extracted from chunks
 CREATE TABLE entities (
@@ -201,6 +202,9 @@ CREATE TABLE entities (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, name, type)
 );
+CREATE INDEX idx_entities_user_id    ON entities(user_id);
+CREATE INDEX idx_entities_type       ON entities(type);
+CREATE INDEX idx_entities_name_lower ON entities(LOWER(name));
 
 -- Entity occurrences within chunks
 CREATE TABLE entity_mentions (
@@ -213,6 +217,8 @@ CREATE TABLE entity_mentions (
     confidence   NUMERIC(4,3) NOT NULL DEFAULT 0.0 CHECK (confidence BETWEEN 0 AND 1),
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_mentions_entity_id ON entity_mentions(entity_id);
+CREATE INDEX idx_mentions_chunk_id  ON entity_mentions(chunk_id);
 
 -- Relationships between entities
 CREATE TABLE relationships (
@@ -228,6 +234,9 @@ CREATE TABLE relationships (
     CHECK (source_entity_id <> target_entity_id),
     UNIQUE (source_entity_id, target_entity_id, predicate)
 );
+CREATE INDEX idx_rel_source    ON relationships(source_entity_id);
+CREATE INDEX idx_rel_target    ON relationships(target_entity_id);
+CREATE INDEX idx_rel_predicate ON relationships(predicate);
 
 -- Registered LLM models
 CREATE TABLE llms (
@@ -251,8 +260,10 @@ CREATE TABLE queries (
     confidence           NUMERIC(4,3) CHECK (confidence BETWEEN 0 AND 1),
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_queries_user_id    ON queries(user_id);
+CREATE INDEX idx_queries_created_at ON queries(created_at DESC);
 
--- Individual LLM responses to queries
+-- Individual LLM responses per query
 CREATE TABLE llm_responses (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     query_id      UUID         NOT NULL REFERENCES queries(id) ON DELETE CASCADE,
@@ -264,6 +275,7 @@ CREATE TABLE llm_responses (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     UNIQUE (query_id, llm_id)
 );
+CREATE INDEX idx_llm_responses_query_id ON llm_responses(query_id);
 
 -- Entity citations for queries
 CREATE TABLE query_citations (
@@ -274,9 +286,19 @@ CREATE TABLE query_citations (
     chunk_id        UUID    REFERENCES document_chunks(id)        ON DELETE SET NULL,
     rank            INTEGER NOT NULL DEFAULT 0
 );
+CREATE INDEX idx_citations_query_id ON query_citations(query_id);
+
+-- Auto-update updated_at timestamps
+CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_updated_at     BEFORE UPDATE ON users     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_documents_updated_at BEFORE UPDATE ON documents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_entities_updated_at  BEFORE UPDATE ON entities  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Convenience view for graph edges
-CREATE VIEW v_graph_edges AS
+CREATE OR REPLACE VIEW v_graph_edges AS
 SELECT
     r.id              AS edge_id,
     r.source_entity_id,
@@ -291,22 +313,10 @@ FROM relationships r
 JOIN entities s ON s.id = r.source_entity_id
 JOIN entities t ON t.id = r.target_entity_id;
 
--- Seed default LLM models
-INSERT INTO llms (model_id, display_name, provider, enabled, weight) VALUES
-    ('gpt-5',           'GPT-5',          'OpenAI',    TRUE,  0.350),
-    ('claude-opus-4',   'Claude Opus 4',  'Anthropic', TRUE,  0.300),
-    ('gemini-2.5-pro',  'Gemini 2.5 Pro', 'Google',    TRUE,  0.250),
-    ('llama-3.1-405b',  'Llama 3.1 405B', 'Meta',      FALSE, 0.100)
+-- Seed LLM (only Groq is used — free, no setup required beyond API key)
+INSERT INTO llms (model_id, display_name, provider, enabled, weight)
+VALUES ('llama-3.1-8b-instant', 'Llama 3.1 8B Instant', 'Meta', TRUE, 1.0)
 ON CONFLICT (model_id) DO NOTHING;
-
--- Auto-update updated_at timestamps
-CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_users_updated_at     BEFORE UPDATE ON users     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_documents_updated_at BEFORE UPDATE ON documents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_entities_updated_at  BEFORE UPDATE ON entities  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ```
 
 ---
@@ -317,8 +327,7 @@ CREATE TRIGGER trg_entities_updated_at  BEFORE UPDATE ON entities  FOR EACH ROW 
 
 - Node.js 18+
 - PostgreSQL 14+
-- npm
-- A [Groq API key](https://console.groq.com) (free) for LLM extraction
+- A free [Groq API key](https://console.groq.com)
 
 ### 1. Clone and install
 
@@ -326,13 +335,8 @@ CREATE TRIGGER trg_entities_updated_at  BEFORE UPDATE ON entities  FOR EACH ROW 
 git clone <your-repo-url>
 cd graph-weaver-pro
 
-# Install backend dependencies
-cd backend
-npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
+cd backend && npm install
+cd ../frontend && npm install
 ```
 
 ### 2. Create the database
@@ -346,27 +350,27 @@ psql -U postgres -d synapse -f backend/schema.sql
 
 ```bash
 cp backend/.env.example backend/.env
-# Edit backend/.env with your values (see below)
+# Edit backend/.env — see Environment Variables below
 ```
 
-### 4. Run the app
+### 4. Run
 
 ```bash
-# Terminal 1 — backend
+# Terminal 1
 cd backend && npm run dev
 
-# Terminal 2 — frontend
+# Terminal 2
 cd frontend && npm run dev
 ```
 
 Frontend: http://localhost:8080  
-Backend API: http://localhost:4000
+Backend: http://localhost:4000
 
 ---
 
 ## Environment Variables
 
-Create `backend/.env`:
+`backend/.env`:
 
 ```env
 # Database
@@ -377,7 +381,7 @@ PGPASSWORD=postgres
 PGDATABASE=synapse
 
 # Auth
-JWT_SECRET=your-secret-key-change-this-in-production
+JWT_SECRET=change-this-in-production
 JWT_EXPIRES_IN=7d
 
 # File uploads
@@ -387,98 +391,118 @@ MAX_UPLOAD_MB=50
 # Password reset
 RESET_TOKEN_EXPIRES_MIN=30
 
-# LLM API keys (all optional — Groq is the free fallback)
-GROQ_API_KEY=gsk_...          # Free at console.groq.com — enables LLM extraction
-OPENAI_API_KEY=sk-...         # Optional
-ANTHROPIC_API_KEY=sk-ant-...  # Optional
-GOOGLE_API_KEY=...            # Optional
+# LLM — only GROQ_API_KEY is required for full functionality
+GROQ_API_KEY=gsk_...
+OPENAI_API_KEY=      # optional
+ANTHROPIC_API_KEY=   # optional
+GOOGLE_API_KEY=      # optional
 ```
-
-> **Minimum requirement:** Only `GROQ_API_KEY` is needed for full functionality. Without it, extraction falls back to regex patterns which are less accurate.
 
 ---
 
 ## API Reference
 
-All routes are prefixed with `/api`. Protected routes require `Authorization: Bearer <token>`.
+All routes prefixed with `/api`. Protected routes require `Authorization: Bearer <token>`.
 
 ### Auth
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/auth/signup` | No | Register a new user |
+| POST | `/auth/signup` | No | Register |
 | POST | `/auth/signin` | No | Sign in, returns JWT |
-| GET | `/auth/me` | Yes | Get current user |
+| GET | `/auth/me` | Yes | Current user |
 | POST | `/auth/forgot-password` | No | Generate reset token |
-| POST | `/auth/reset-password` | No | Reset password with token |
+| POST | `/auth/reset-password` | No | Reset with token |
 
 ### Documents
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/documents` | Yes | List all documents |
-| GET | `/documents/:id` | Yes | Get single document |
-| POST | `/documents/upload` | Yes | Upload file (multipart/form-data) |
-| DELETE | `/documents/:id` | Yes | Delete document |
+| GET | `/documents` | Yes | List documents |
+| GET | `/documents/:id` | Yes | Get one |
+| POST | `/documents/upload` | Yes | Upload — auto-deletes previous data |
+| DELETE | `/documents/:id` | Yes | Delete one |
 
 ### Entities & Graph
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/entities` | Yes | List entities (`?type=&search=&limit=`) |
-| GET | `/entities/:id` | Yes | Get single entity |
+| GET | `/entities` | Yes | List (`?type=&search=&limit=`) |
+| GET | `/entities/:id` | Yes | Get one |
 | GET | `/relationships` | Yes | List relationships |
-| GET | `/graph` | Yes | Full graph (nodes + edges) |
-| GET | `/graph/:entityId/neighbors` | Yes | Entity neighborhood |
+| GET | `/graph` | Yes | Full graph (nodes + edges, user-scoped) |
+| GET | `/graph/:entityId/neighbors` | Yes | Neighbors of an entity |
 
 ### Search & Orchestrator
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/search` | Yes | Semantic query `{ q: string }` |
-| GET | `/orchestrator/llms` | Yes | List registered LLMs |
+| POST | `/search` | Yes | Document-grounded query `{ q: string }` |
+| GET | `/orchestrator/llms` | Yes | List models |
+| PATCH | `/orchestrator/llms/:id` | Yes | Toggle enabled `{ enabled: boolean }` |
 | POST | `/orchestrator/query` | Yes | Direct LLM fan-out |
 
 ### Processor
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/processor/process-queued` | Yes | Manually reprocess queued/failed documents |
+| POST | `/processor/process-queued` | Yes | Reprocess queued/failed documents |
 
 ---
 
 ## Pipeline Overview
 
 ```
-Upload PDF/DOCX/TXT
+Upload PDF / DOCX / TXT
         │
         ▼
-  documents table (status: queued)
+  Delete all previous data for this user
+  (entity_mentions → relationships → entities → documents)
         │
-        ▼  (setImmediate — non-blocking)
+        ▼
+  Insert new document row (status: queued)
+        │
+        ▼  setImmediate — non-blocking
   extraction.service.js
         │
-        ├─ status: parsing  → Read file with pdfjs-dist (PDF) or mammoth (DOCX)
-        ├─ status: extracting → Chunk text → call Groq llama-3.1-8b-instant
-        │                       for each chunk → parse JSON entities + relationships
-        └─ status: indexed  → Store in entities, entity_mentions, relationships tables
-                                        │
-                                        ▼
-                              Graph page (React Flow)
-                              Extraction page (entity list)
-                              Search page (LLM fan-out + synthesis)
+        ├─ status: parsing    → Read file (pdfjs-dist for PDF, mammoth for DOCX)
+        ├─ status: extracting → Chunk text (2000 chars) →
+        │                       call Groq llama-3.1-8b-instant per chunk →
+        │                       parse JSON { entities, relationships } →
+        │                       store in entities + relationships tables
+        └─ status: indexed    → Done
+                │
+                ▼
+      Graph page   — dagre layout, color-coded by type, fullscreen
+      Extraction   — entity + relationship counts
+      Search       — LLM answers grounded in your document chunks + graph
 ```
 
 ---
 
-## Known Issues & Fixes
+## Resetting All Data
 
-### Document stuck on "Queued"
-The processor wasn't being triggered after upload. Fixed in `documents.controller.js` by calling `processDocument()` via `setImmediate` after the upload response is sent.
+To wipe everything and start fresh, run in pgAdmin or psql:
 
-### "Install" appearing as entity
-`pdf-parse` was failing silently on newer Node.js versions (`DOMMatrix is not defined`) and returning a placeholder string that got parsed as entities. Fixed by switching to `pdfjs-dist` with the legacy ESM build.
+```sql
+DELETE FROM entity_mentions;
+DELETE FROM relationships;
+DELETE FROM entities;
+DELETE FROM document_chunks;
+DELETE FROM documents;
+```
 
-### pdfjs-dist worker path on Windows
-`require.resolve()` returns a `C:\...` path which Node's ESM loader rejects. Fixed by wrapping with `pathToFileURL(workerPath).href` to produce a valid `file:///C:/...` URL.
+Then re-upload your document.
 
-### entity_mentions insert missing user_id
-The original extraction service inserted entities without `user_id`, violating the `UNIQUE (user_id, name, type)` constraint. Fixed by passing `userId` through to `extractFromDocument()`.
+---
 
-### Excessive polling
-`useDocuments` was polling every 2 seconds indefinitely. Fixed to only poll while a document's status is `parsing` or `extracting`, and stop once all are `indexed` or `failed`.
+## Known Issues & Fixes Applied
+
+| Issue | Fix |
+|---|---|
+| Document stuck on "Queued" | `upload` handler now calls `processDocument()` via `setImmediate` after responding |
+| "Install" appearing as entity | `pdf-parse` fails silently on Node 18+ (`DOMMatrix` missing); switched to `pdfjs-dist` legacy ESM build |
+| pdfjs worker path on Windows | `require.resolve()` returns `C:\...`; fixed with `pathToFileURL(workerPath).href` |
+| `user_id` missing from entity inserts | `extractFromDocument` now accepts and passes `userId` to all DB inserts |
+| Old entities persisting after new upload | Upload now explicitly deletes `entity_mentions → relationships → entities → documents` in order before inserting |
+| Graph not filtered by user | `graph.controller.js` now adds `WHERE user_id = $1` to both nodes and edges queries |
+| Search using external knowledge | `search.controller.js` now builds graph context + chunk context and passes it to the LLM prompt |
+| LLM toggle not persisting | Added `PATCH /orchestrator/llms/:id` endpoint; `Orchestrator.tsx` calls it on switch change |
+| Excessive document polling | `useDocuments` only polls every 2s when status is `parsing` or `extracting`, stops otherwise |
+| Graph node overlap | Replaced custom force simulation with `@dagrejs/dagre` for guaranteed non-overlapping layout |
+| Fullscreen button broken | Replaced React Flow `<Controls>` with custom buttons; fullscreen calls `requestFullscreen()` on the canvas div directly |
